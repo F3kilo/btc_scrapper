@@ -13,8 +13,13 @@ services:
   cookies:
     image: ghcr.io/sarperavci/cloudflarebypassforscraping:latest
     restart: always
+    expose:
+      - 8000
     ports:
       - 8000:8000
+      - 4901:4901
+      - 5901:5901
+      - 6901:6901
 
   btc_scrapper:
     build:

@@ -76,7 +76,7 @@ impl Agent {
         let client = Client::new();
         let query = [("url", WEBSITE), ("retries", "5")];
         let response = client
-            .get(Url::parse("http://localhost:8000/cookies")?)
+            .get(Url::parse("http://cookies:8000/cookies")?)
             .query(&query)
             .send()
             .await?;
@@ -91,7 +91,7 @@ impl Agent {
             .and_then(|c| c.as_object())
         {
             let mut cookies = Vec::new();
-            for (k, v) in dbg!(json_cookies) {
+            for (k, v) in json_cookies {
                 cookies.push(format!(
                     "{}={}",
                     k,
@@ -126,14 +126,13 @@ impl Agent {
 }
 
 fn find_price(text: String) -> Option<f64> {
-    let start = dbg!(text.find(r#"{"name":"Bitcoin","price":"#))?;
+    let start = text.find(r#"{"name":"Bitcoin","price":"#)?;
     let tail = &text[start + 26..];
-    dbg!(&tail[..42]);
     let price_str = tail
         .chars()
         .take_while(|c| c.is_digit(10))
         .collect::<String>();
-    dbg!(&price_str);
+    tracing::debug!("Parsed price string: {price_str}");
     let price = price_str.parse::<f64>().ok()?;
 
     Some(price)
