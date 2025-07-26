@@ -21,7 +21,6 @@ pub async fn query_price(agent: &Agent) -> Result<Price, anyhow::Error> {
     let resp = resp.error_for_status()?;
 
     let text = resp.text().await?;
-    println!("{}", text);
 
     let price =
         find_price(text).ok_or_else(|| anyhow::Error::msg("Failed to find price in response."))?;
