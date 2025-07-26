@@ -38,7 +38,7 @@ socket.onmessage = function(event) {
     dataset.data.push(data.bitcoin.usd);
   });
 
-  if (chart.data.labels.length > 10) {
+  if (chart.data.labels.length > 100) {
     chart.data.labels.shift();
     chart.data.datasets.forEach((dataset) => {
       dataset.data.shift();

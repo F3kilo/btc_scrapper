@@ -9,7 +9,17 @@ services:
       POSTGRES_DB: price_scrapper
     ports:
       - 5432:5432
+    networks:
+      - local
   
+  cookies:
+    image: ghcr.io/sarperavci/cloudflarebypassforscraping:latest
+    restart: always
+    ports:
+      - 8000:8000
+    networks:
+      - local
+
   btc_scrapper:
     build:
       dockerfile: Dockerfile
@@ -18,5 +28,12 @@ services:
         POSTGRES_CONN_STR: postgres://postgres:example@db:5432/price_scrapper
     ports:
       - 33987:33987
+    networks:
+      - local
     depends_on:
       - db
+      - cookies
+
+networks:
+  local:
+    driver: bridge

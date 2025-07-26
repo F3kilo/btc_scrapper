@@ -14,7 +14,10 @@ use tower_http::trace::DefaultMakeSpan;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use crate::scrap::Agent;
+
 mod db;
+mod scrap;
 
 /// State shared between app clients.
 struct AppState {
@@ -33,6 +36,8 @@ impl Clone for AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -81,12 +86,14 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// How often to query prices from a service.
-const QUERY_PERIOD: Duration = Duration::from_secs(5);
+const QUERY_PERIOD: Duration = Duration::from_secs(1);
 
 async fn prices_update_routine(db: Db, tx: broadcast::Sender<Price>) {
     let mut last_timestamp = Option::<u64>::None;
+    let agent = Agent::new().await.expect("Failed to create Agent.");
+
     loop {
-        if let Err(e) = update_price(&db, &tx, &mut last_timestamp).await {
+        if let Err(e) = update_price(&agent, &db, &tx, &mut last_timestamp).await {
             tracing::warn!("Routine failure: {e}");
         }
         tokio::time::sleep(QUERY_PERIOD).await;
@@ -94,11 +101,12 @@ async fn prices_update_routine(db: Db, tx: broadcast::Sender<Price>) {
 }
 
 async fn update_price(
+    agent: &Agent,
     db: &Db,
     tx: &broadcast::Sender<Price>,
     last_timestamp: &mut Option<u64>,
 ) -> anyhow::Result<()> {
-    let price = match dbg!(query_price().await) {
+    let price = match scrap::query_price(agent).await {
         Ok(p) => p,
         Err(e) => {
             anyhow::bail!("Failed to query price: {e}.");
@@ -127,7 +135,7 @@ async fn price_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl I
 }
 
 async fn handle_socket(mut socket: WebSocket, mut state: AppState) -> anyhow::Result<()> {
-    let timestamp = dbg!(Utc::now().timestamp_millis() / 1000) - 600;
+    let timestamp = (Utc::now().timestamp_millis() / 1000) - 600;
     let prices = match state.db.prices_since(timestamp).await {
         Ok(p) => p,
         Err(e) => {
@@ -136,7 +144,7 @@ async fn handle_socket(mut socket: WebSocket, mut state: AppState) -> anyhow::Re
         }
     };
 
-    for price in dbg!(prices) {
+    for price in prices {
         let json_price = Json::from(price).encode_to_string()?;
         socket.send(Message::Text(json_price.into())).await?;
     }
@@ -150,41 +158,18 @@ async fn handle_socket(mut socket: WebSocket, mut state: AppState) -> anyhow::Re
 }
 
 /// Price data.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 struct Price {
     /// BTC info.
     pub bitcoin: PriceInfo,
 }
 
 /// USD value.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-struct PriceInfo {
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct PriceInfo {
     /// Price value.
-    pub usd: u64,
+    pub usd: f64,
 
     /// Last update unix timestamp.
     pub last_updated_at: u64,
-}
-
-/// Query latest BTC price in USD.
-async fn query_price() -> Result<Price, anyhow::Error> {
-    let params = [
-        ("vs_currencies", "usd"),
-        ("ids", "bitcoin"),
-        ("include_last_updated_at", "true"),
-    ];
-    let client = reqwest::Client::new();
-    let response = client
-        .get("https://api.coingecko.com/api/v3/simple/price")
-        .query(&params)
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        tracing::debug!("Failed to query price info: {response:?}.");
-    }
-
-    tracing::debug!("{response:?}");
-
-    Ok(response.json().await?)
 }

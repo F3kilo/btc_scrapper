@@ -31,7 +31,7 @@ impl Db {
 
         sqlx::query("INSERT INTO prices (datetime, price) VALUES ($1, $2)")
             .bind(updated_dt.naive_utc())
-            .bind(price.bitcoin.usd as i64)
+            .bind(price.bitcoin.usd)
             .execute(&self.pool)
             .await?;
 
@@ -52,7 +52,7 @@ impl Db {
         for row in rows {
             let last_updated_at =
                 row.get::<NaiveDateTime, _>(0).and_utc().timestamp_millis() as u64 / 1000;
-            let usd = row.get::<i64, _>(1) as u64;
+            let usd = row.get::<f64, _>(1);
 
             prices.push(Price {
                 bitcoin: PriceInfo {
