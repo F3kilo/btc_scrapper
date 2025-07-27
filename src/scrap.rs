@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 
 use crate::{Price, PriceInfo};
 
-const WEBSITE: &str = "https://www.blockchain.com/ru/explorer/assets/btc";
+const WEBSITE: &str = "https://bitbo.io/";
 
 /// Query latest BTC price in USD.
 pub async fn query_price(agent: &Agent) -> Result<Price, anyhow::Error> {
@@ -19,7 +19,6 @@ pub async fn query_price(agent: &Agent) -> Result<Price, anyhow::Error> {
     };
 
     let resp = resp.error_for_status()?;
-
     let text = resp.text().await?;
 
     let price =
@@ -125,11 +124,12 @@ impl Agent {
 }
 
 fn find_price(text: String) -> Option<f64> {
-    let start = text.find(r#"{"name":"Bitcoin","price":"#)?;
-    let tail = &text[start + 26..];
+    let start = text.find(r#"<div class="amount">"#)?;
+    let tail = &text[start + 20..];
     let price_str = tail
         .chars()
-        .take_while(|c| c.is_digit(10))
+        .filter(|c| c != &',' && !c.is_whitespace())
+        .take_while(|c| c.is_digit(10) || c == &'.')
         .collect::<String>();
     tracing::debug!("Parsed price string: {price_str}");
     let price = price_str.parse::<f64>().ok()?;
