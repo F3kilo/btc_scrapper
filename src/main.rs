@@ -36,8 +36,6 @@ impl Clone for AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
